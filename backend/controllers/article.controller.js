@@ -1,6 +1,9 @@
 const Article = require("../models/Article");
 
-// CREATE article
+/**
+ * CREATE article
+ * Used in Phase-1 and optionally Phase-2
+ */
 exports.createArticle = async (req, res) => {
   try {
     const article = await Article.create(req.body);
@@ -13,7 +16,9 @@ exports.createArticle = async (req, res) => {
   }
 };
 
-// GET all articles
+/**
+ * GET all articles
+ */
 exports.getAllArticles = async (req, res) => {
   try {
     const articles = await Article.find().sort({ createdAt: -1 });
@@ -26,7 +31,9 @@ exports.getAllArticles = async (req, res) => {
   }
 };
 
-// GET single article by ID
+/**
+ * GET single article by ID
+ */
 exports.getArticleById = async (req, res) => {
   try {
     const article = await Article.findById(req.params.id);
@@ -44,13 +51,33 @@ exports.getArticleById = async (req, res) => {
   }
 };
 
-// UPDATE article
+/**
+ * UPDATE article (Phase-2 CORE)
+ * Safely updates only allowed fields
+ */
 exports.updateArticle = async (req, res) => {
   try {
-    const updated = await Article.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
+    // ✅ Allow ONLY these fields to be updated
+    const allowedUpdates = (({
+      title,
+      enhancedContent,
+      isEnhanced,
+      citations,
+    }) => ({
+      title,
+      enhancedContent,
+      isEnhanced,
+      citations,
+    }))(req.body);
+
+    const updated = await Article.findByIdAndUpdate(
+      req.params.id,
+      allowedUpdates,
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
 
     if (!updated) {
       return res.status(404).json({ message: "Article not found" });
@@ -65,7 +92,9 @@ exports.updateArticle = async (req, res) => {
   }
 };
 
-// DELETE article
+/**
+ * DELETE article
+ */
 exports.deleteArticle = async (req, res) => {
   try {
     const deleted = await Article.findByIdAndDelete(req.params.id);
@@ -83,7 +112,10 @@ exports.deleteArticle = async (req, res) => {
   }
 };
 
-// GET article by slug (VERY IMPORTANT)
+/**
+ * GET article by slug
+ * Used by frontend / SEO
+ */
 exports.getArticleBySlug = async (req, res) => {
   try {
     const article = await Article.findOne({ slug: req.params.slug });
