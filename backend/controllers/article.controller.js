@@ -43,3 +43,60 @@ exports.getArticleById = async (req, res) => {
     });
   }
 };
+
+// UPDATE article
+exports.updateArticle = async (req, res) => {
+  try {
+    const updated = await Article.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!updated) {
+      return res.status(404).json({ message: "Article not found" });
+    }
+
+    res.json(updated);
+  } catch (error) {
+    res.status(400).json({
+      message: "Failed to update article",
+      error: error.message,
+    });
+  }
+};
+
+// DELETE article
+exports.deleteArticle = async (req, res) => {
+  try {
+    const deleted = await Article.findByIdAndDelete(req.params.id);
+
+    if (!deleted) {
+      return res.status(404).json({ message: "Article not found" });
+    }
+
+    res.json({ message: "Article deleted successfully" });
+  } catch (error) {
+    res.status(400).json({
+      message: "Failed to delete article",
+      error: error.message,
+    });
+  }
+};
+
+// GET article by slug (VERY IMPORTANT)
+exports.getArticleBySlug = async (req, res) => {
+  try {
+    const article = await Article.findOne({ slug: req.params.slug });
+
+    if (!article) {
+      return res.status(404).json({ message: "Article not found" });
+    }
+
+    res.json(article);
+  } catch (error) {
+    res.status(400).json({
+      message: "Failed to fetch article",
+      error: error.message,
+    });
+  }
+};
