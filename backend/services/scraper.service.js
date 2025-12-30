@@ -1,9 +1,9 @@
 const axios = require("axios");
 const cheerio = require("cheerio");
 const cleanText = require("../utils/cleanText");
+const Article = require("../models/Article"); // ✅ ADD THIS
 
 const BLOG_LIST_URL = "https://beyondchats.com/blogs/";
-const BASE_URL = "https://beyondchats.com";
 
 // 🔹 Remove known non-editorial prefixes injected by CMS
 function removeLeadingJunk(text) {
@@ -22,86 +22,76 @@ function removeLeadingJunk(text) {
 
 // 🔹 Dynamically detect the last blog page
 async function getLastBlogPage() {
-  const { data: html } = await axios.get(BLOG_LIST_URL, { timeout: 15000 });
-  const $ = cheerio.load(html);
+  const { data } = await axios.get(BLOG_LIST_URL, { timeout: 15000 });
+  const $ = cheerio.load(data);
 
-  let maxPage = 1;
-
+  let max = 1;
   $("a[href*='/blogs/page/']").each((_, el) => {
-    const href = $(el).attr("href");
-    const match = href.match(/\/blogs\/page\/(\d+)/);
-    if (match) {
-      maxPage = Math.max(maxPage, parseInt(match[1], 10));
-    }
+    const m = $(el)
+      .attr("href")
+      ?.match(/page\/(\d+)/);
+    if (m) max = Math.max(max, Number(m[1]));
   });
 
-  return maxPage;
+  return max;
 }
 
-// slug helper
+// 🔹 slug helper
 const slugify = (text) =>
   text
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 
+/**
+ * ✅ FINAL, CORRECT IMPLEMENTATION
+ */
 async function fetchOldestArticles() {
-  // ✅ STEP 1: Collect the true oldest article links via pagination
-  const oldestArticleLinks = [];
   const lastPage = await getLastBlogPage();
-  const secondLastPage = lastPage - 1;
+  const posts = [];
 
-  for (let page = lastPage; page >= 1; page--) {
+  // 🔹 STEP 1: Collect ALL posts with publish dates
+  for (let page = 1; page <= lastPage; page++) {
     const pageUrl =
       page === 1 ? BLOG_LIST_URL : `${BLOG_LIST_URL}page/${page}/`;
 
-    const { data: pageHtml } = await axios.get(pageUrl, { timeout: 15000 });
-    const $page = cheerio.load(pageHtml);
+    console.log("Scraping list:", pageUrl);
 
-    const pageLinks = [];
+    const { data } = await axios.get(pageUrl, { timeout: 15000 });
+    const $ = cheerio.load(data);
 
-    $page("a[href]").each((_, el) => {
-      const href = $page(el).attr("href");
+    $("article.entry-card").each((_, article) => {
+      const title = $(article).find("h2.entry-title a").text().trim();
+      const link = $(article).find("h2.entry-title a").attr("href");
+      const datetime = $(article).find("time").attr("datetime");
 
-      if (
-        href &&
-        href.startsWith("/blogs/") &&
-        href !== "/blogs/" &&
-        !href.includes("/tag/") &&
-        !href.includes("/page/")
-      ) {
-        pageLinks.push(`${BASE_URL}${href}`);
+      if (title && link && datetime) {
+        posts.push({
+          title,
+          link,
+          date: new Date(datetime),
+        });
       }
     });
-
-    // Oldest articles are at the bottom of each page
-    for (let i = pageLinks.length - 1; i >= 0; i--) {
-      if (!oldestArticleLinks.includes(pageLinks[i])) {
-        oldestArticleLinks.push(pageLinks[i]);
-      }
-
-      if (oldestArticleLinks.length === 5) break;
-    }
-
-    // ✅ CRITICAL FIX: stop ONLY after processing page 14
-    if (oldestArticleLinks.length === 5 && page <= secondLastPage) {
-      break;
-    }
   }
 
-  // ✅ STEP 2: Scrape article content (already-correct logic)
+  // 🔹 STEP 2: Sort by TRUE publish date (oldest first)
+  posts.sort((a, b) => a.date - b.date);
+  const oldestFive = posts.slice(0, 5);
+
+  // 🔹 STEP 3: Scrape article content
   const articles = [];
 
-  for (const url of oldestArticleLinks) {
+  for (const post of oldestFive) {
     try {
-      const { data: articleHtml } = await axios.get(url, { timeout: 15000 });
+      const { data: articleHtml } = await axios.get(post.link, {
+        timeout: 15000,
+      });
       const $$ = cheerio.load(articleHtml);
 
-      // 1️⃣ Title
       const title = $$("h1").first().text().trim();
       if (!title) continue;
 
-      // 2️⃣ Find main content container (largest text block)
       let content = "";
 
       const candidateDiv = $$("div")
@@ -113,7 +103,6 @@ async function fetchOldestArticles() {
 
       if (!candidateDiv.length) continue;
 
-      // 3️⃣ Stop phrases (footer / comments)
       const STOP_PHRASES = [
         "For more such amazing content",
         "Your email address will not be published",
@@ -121,19 +110,17 @@ async function fetchOldestArticles() {
         "Required fields are marked",
       ];
 
-      // 4️⃣ Extract article text
       candidateDiv.find("p, h2, h3, li").each((_, el) => {
         const text = $$(el).text().trim();
         if (!text || text.length < 40) return;
 
-        if (STOP_PHRASES.some((phrase) => text.includes(phrase))) {
-          return false; // break
+        if (STOP_PHRASES.some((p) => text.includes(p))) {
+          return false;
         }
 
         content += text + "\n\n";
       });
 
-      // ✅ Final cleanup pass
       let cleanedContent = cleanText(content);
       cleanedContent = removeLeadingJunk(cleanedContent);
 
@@ -143,11 +130,21 @@ async function fetchOldestArticles() {
         title,
         slug: slugify(title),
         originalContent: cleanedContent,
-        sourceUrl: url,
+        sourceUrl: post.link,
+        publishedAt: post.date,
       });
     } catch (err) {
-      console.error(`Failed to scrape ${url}: ${err.message}`);
+      console.error(`Failed to scrape ${post.link}: ${err.message}`);
     }
+  }
+
+  // 🔹 STEP 4: Persist to MongoDB (IDEMPOTENT ✅)
+  for (const article of articles) {
+    await Article.updateOne(
+      { sourceUrl: article.sourceUrl },
+      { $setOnInsert: article },
+      { upsert: true }
+    );
   }
 
   return articles;
