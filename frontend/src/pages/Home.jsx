@@ -17,7 +17,7 @@ export default function Home() {
 
       <div className="grid">
         {articles.map((a) => (
-          <ArticleCard key={a._id} article={a} onOpen={setSelected} />
+          <ArticleCard key={a._id} article={a} onOpen={() => setSelected(a)} />
         ))}
       </div>
 
