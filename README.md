@@ -16,7 +16,7 @@ The AI Content Pipeline is a full-stack web application that enhances the conten
 
 The system follows a clean client–server architecture:
 
-![Architecture Diagram](content-pipeline.png)
+![Architecture Diagram](content-pipeline.drawio.png)
 
 - The **Frontend (React + Vite)** allows users to browse articles and view comparisons.
 - The **Backend API (Node.js + Express)** acts as the core orchestrator.
@@ -80,3 +80,25 @@ The backend API should be running at http://localhost:8080.
 - Clicking on any article opens a modal showing the original and enhanced content side by side.
 - You can view references scraped from other websites below the content.
 
+## Live Links
+
+- Frontend Live Link: [https://content-pipeline.vercel.app/](https://content-pipeline-gold.vercel.app/)
+- Backend API Live Link: [https://content-pipeline-up.railway.app/](https://content-pipeline.up.railway.app/)
+
+## Contributing
+
+- Fork this repository.
+- Clone your fork and create a new branch. ```git checkout -b feature-name```
+- Make your changes and commit them. ```git commit -am 'Add new feature'```
+- Push to your branch. ```git push origin feature-name```
+- Open a pull request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE
+
+## Acknowledgments
+
+- OpenAI API for AI-powered content enhancement.
+- Vercel and Railway for deployment.
+- MongoDB for database management.
