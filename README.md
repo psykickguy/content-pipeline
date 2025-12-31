@@ -12,7 +12,7 @@ The AI Content Pipeline is a full-stack web application that enhances the conten
 - Displays references from articles that were scraped from the web.
 - Fully responsive design with modern animations and effects.
 
-### Architecture Overview
+## Architecture Overview
 
 The system follows a clean client–server architecture:
 
